@@ -1,4 +1,4 @@
-// Tokat Hat 11 - Sıfır Bağımlılıklı Kentkart CORS Proxy (Netlify Functions)
+// Tokat Canlı Otobüs Takip v3 - Sıfır Bağımlılıklı Kentkart CORS Proxy (Netlify Functions)
 // Node.js 18+ dahili fetch API kullanır; package.json veya axios gerekmez.
 
 const KENTKART_BASE = 'https://service.kentkart.com';
@@ -12,13 +12,8 @@ const CORS_HEADERS = {
 };
 
 exports.handler = async (event) => {
-  // CORS Preflight (OPTIONS)
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 204,
-      headers: CORS_HEADERS,
-      body: '',
-    };
+    return { statusCode: 204, headers: CORS_HEADERS, body: '' };
   }
 
   if (event.httpMethod !== 'GET') {
@@ -30,28 +25,26 @@ exports.handler = async (event) => {
   }
 
   try {
-    // Hem /api/... hem /.netlify/functions/proxy/... yollarını güvenli şekilde temizle
     const rawPath = event.path || '';
     const cleanPath = rawPath
       .replace(/^\/\.netlify\/functions\/proxy\/?/, '')
       .replace(/^\/api\/?/, '')
       .replace(/^\/+/, '');
 
-    // Sağlık kontrolü: /api/health
     if (cleanPath === 'health' || cleanPath === '') {
       return {
         statusCode: 200,
         headers: CORS_HEADERS,
         body: JSON.stringify({
           ok: true,
-          service: 'tokat-11-kentkart-proxy',
+          version: 'v3',
+          service: 'tokat-kentkart-proxy',
           runtime: process.version,
           timestamp: new Date().toISOString(),
         }),
       };
     }
 
-    // Güvenlik: Yalnızca Kentkart rl1/ veya api/ yollarına izin ver, yol geçişini engelle
     if (cleanPath.includes('..') || !/^(rl1|api)\//i.test(cleanPath)) {
       return {
         statusCode: 400,
@@ -63,7 +56,6 @@ exports.handler = async (event) => {
       };
     }
 
-    // Query parametrelerini koru
     let queryString = '';
     if (event.rawQuery && event.rawQuery.length > 0) {
       queryString = `?${event.rawQuery}`;
@@ -74,9 +66,8 @@ exports.handler = async (event) => {
 
     const targetUrl = `${KENTKART_BASE}/${cleanPath}${queryString}`;
 
-    // 12 saniye zaman aşımı koruması
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 14000);
 
     let upstream;
     try {
@@ -103,6 +94,7 @@ exports.handler = async (event) => {
       headers: {
         ...CORS_HEADERS,
         'X-Upstream-Status': String(upstream.status),
+        'X-Upstream-Path': cleanPath,
       },
       body: bodyText,
     };
@@ -113,7 +105,7 @@ exports.handler = async (event) => {
       headers: CORS_HEADERS,
       body: JSON.stringify({
         error: isTimeout
-          ? 'Kentkart sunucusu zaman aşımına uğradı (12sn).'
+          ? 'Kentkart sunucusu zaman aşımına uğradı (14sn).'
           : 'Kentkart API bağlantısı kurulamadı.',
         detail: err ? String(err.message || err) : 'Bilinmeyen hata',
       }),
