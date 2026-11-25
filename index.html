@@ -1,0 +1,1776 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Tokat Hat 11 (TOKİ Evleri) — Canlı Otobüs Takip</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --surface: #ffffff;
+      --surface-2: #f8fafc;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #0f766e;
+      --primary-light: #ccfbf1;
+      --dir0: #0d9488;
+      --dir1: #ea580c;
+      --ok: #16a34a;
+      --ok-bg: #dcfce7;
+      --info: #2563eb;
+      --info-bg: #dbeafe;
+      --err: #dc2626;
+      --err-bg: #fee2e2;
+      --warn: #d97706;
+      --warn-bg: #fef3c7;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      --radius: 14px;
+    }
+
+    body.dark {
+      --bg: #0b1120;
+      --surface: #111827;
+      --surface-2: #1e293b;
+      --border: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --primary: #14b8a6;
+      --primary-light: #134e4a;
+      --ok-bg: rgba(22, 163, 74, 0.2);
+      --info-bg: rgba(37, 99, 235, 0.22);
+      --err-bg: rgba(220, 38, 38, 0.2);
+      --warn-bg: rgba(217, 119, 6, 0.2);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    body.dark .leaflet-tile-pane {
+      filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      z-index: 1000;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .route-badge {
+      background: linear-gradient(135deg, #0f766e, #0ea5e9);
+      color: #fff;
+      font-weight: 800;
+      font-size: 18px;
+      min-width: 44px;
+      height: 40px;
+      padding: 0 10px;
+      border-radius: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(15, 118, 110, 0.3);
+      flex-shrink: 0;
+    }
+
+    .brand-text { min-width: 0; }
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .brand-sub {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 11px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+      white-space: nowrap;
+    }
+    .status-pill:hover { opacity: 0.9; }
+    .status-pill.ok { background: var(--ok-bg); color: var(--ok); border-color: rgba(22,163,74,0.3); }
+    .status-pill.info { background: var(--info-bg); color: var(--info); border-color: rgba(37,99,235,0.3); }
+    .status-pill.err { background: var(--err-bg); color: var(--err); border-color: rgba(220,38,38,0.35); }
+    .status-pill.loading { background: var(--warn-bg); color: var(--warn); border-color: rgba(217,119,6,0.3); }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .status-pill.ok .dot,
+    .status-pill.loading .dot {
+      animation: pulseDot 1.6s infinite;
+    }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.75); }
+    }
+
+    .icon-btn {
+      height: 36px;
+      padding: 0 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .icon-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .icon-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    .ring-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .ring-svg { width: 18px; height: 18px; transform: rotate(-90deg); }
+    .ring-bg { fill: none; stroke: var(--border); stroke-width: 2.5; }
+    .ring-fg { fill: none; stroke: var(--primary); stroke-width: 2.5; stroke-linecap: round; transition: stroke-dashoffset 0.9s linear; }
+
+    /* Main Layout */
+    .main {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      position: relative;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 390px;
+      max-width: 42vw;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      z-index: 600;
+    }
+
+    .dir-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-2);
+    }
+
+    .dir-btn {
+      padding: 8px 6px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+    .dir-btn.active[data-dir="0"] { background: var(--dir0); color: #fff; border-color: var(--dir0); }
+    .dir-btn.active[data-dir="1"] { background: var(--dir1); color: #fff; border-color: var(--dir1); }
+    .dir-btn.active[data-dir="both"] { background: #334155; color: #fff; border-color: #334155; }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .tab-btn {
+      padding: 11px 6px;
+      background: transparent;
+      border: none;
+      border-bottom: 2.5px solid transparent;
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    .tab-panel {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      min-height: 0;
+    }
+    .tab-panel.active { display: block; }
+
+    /* Banners & Cards */
+    .alert-banner {
+      padding: 10px 12px;
+      border-radius: 11px;
+      font-size: 12px;
+      line-height: 1.45;
+      margin-bottom: 10px;
+      border: 1px solid transparent;
+    }
+    .alert-banner.err { background: var(--err-bg); color: var(--err); border-color: rgba(220,38,38,0.28); }
+    .alert-banner.info { background: var(--info-bg); color: var(--info); border-color: rgba(37,99,235,0.28); }
+    .alert-banner.warn { background: var(--warn-bg); color: var(--warn); border-color: rgba(217,119,6,0.28); }
+    .alert-banner button {
+      margin-top: 6px;
+      padding: 5px 10px;
+      border-radius: 7px;
+      border: none;
+      background: currentColor;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .alert-banner button span { color: #fff; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .stat-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 9px 10px;
+      text-align: center;
+    }
+    .stat-val { font-size: 17px; font-weight: 800; color: var(--text); }
+    .stat-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .bus-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 11px 12px;
+      margin-bottom: 9px;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .bus-card:hover { border-color: var(--primary); transform: translateY(-1px); }
+    .bus-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      gap: 8px;
+    }
+    .plate-tag {
+      font-weight: 800;
+      font-size: 13px;
+      padding: 3px 8px;
+      border-radius: 7px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      letter-spacing: 0.3px;
+    }
+    .dir-tag {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      color: #fff;
+    }
+    .dir-tag.d0 { background: var(--dir0); }
+    .dir-tag.d1 { background: var(--dir1); }
+
+    .bus-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 26px 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+      background: var(--surface-2);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+    }
+    .empty-state strong { color: var(--text); display: block; margin-bottom: 5px; font-size: 14px; }
+
+    /* Stops List */
+    .search-input {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      font-size: 13px;
+      margin-bottom: 10px;
+      outline: none;
+    }
+    .search-input:focus { border-color: var(--primary); }
+
+    .stop-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.12s ease;
+      margin-bottom: 4px;
+    }
+    .stop-item:hover { background: var(--surface-2); border-color: var(--border); }
+    .stop-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--primary-light);
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .stop-item.d1 .stop-num { background: rgba(234,88,12,0.16); color: var(--dir1); }
+    .stop-info { flex: 1; min-width: 0; }
+    .stop-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stop-sub { font-size: 11px; color: var(--muted); }
+    .stop-bus-chip {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--ok-bg);
+      color: var(--ok);
+      flex-shrink: 0;
+    }
+
+    /* Timetable & API Settings */
+    .section-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .times-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .time-chip {
+      padding: 4px 8px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .time-chip.past { opacity: 0.45; }
+    .time-chip.next {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    .form-group { margin-bottom: 10px; }
+    .form-label {
+      display: block;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .form-control {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12.5px;
+      font-family: inherit;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 8px;
+    }
+    .btn-primary {
+      padding: 8px 12px;
+      border-radius: 9px;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-secondary {
+      padding: 8px 12px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .log-box {
+      background: #0f172a;
+      color: #cbd5e1;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      padding: 10px;
+      border-radius: 9px;
+      max-height: 190px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .log-ok { color: #4ade80; }
+    .log-err { color: #f87171; }
+    .log-info { color: #38bdf8; }
+
+    /* Map Container */
+    .map-wrap {
+      flex: 1;
+      position: relative;
+      min-width: 0;
+    }
+    #map { width: 100%; height: 100%; }
+
+    .map-fabs {
+      position: absolute;
+      right: 12px;
+      bottom: 22px;
+      z-index: 500;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .fab {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      transition: transform 0.15s ease;
+    }
+    .fab:hover { transform: scale(1.06); }
+
+    /* Custom Bus Marker */
+    .bus-marker-wrap {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .bus-dot-ring {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 800;
+      border: 2.5px solid #fff;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+      position: relative;
+    }
+    .bus-dot-ring.d0 { background: #0d9488; }
+    .bus-dot-ring.d1 { background: #ea580c; }
+    .bus-dot-ring::after {
+      content: '';
+      position: absolute;
+      inset: -5px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      opacity: 0.45;
+      animation: busRipple 2s infinite;
+    }
+    @keyframes busRipple {
+      0% { transform: scale(0.95); opacity: 0.6; }
+      100% { transform: scale(1.45); opacity: 0; }
+    }
+    .bus-plate-pill {
+      margin-top: 3px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: #0f172a;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    /* Mobile Drawer */
+    .mobile-sheet-toggle { display: none; }
+
+    @media (max-width: 820px) {
+      .main { flex-direction: column; }
+      .map-wrap { flex: 1; min-height: 45vh; }
+      .sidebar {
+        width: 100%;
+        max-width: 100%;
+        height: 46vh;
+        border-right: none;
+        border-top: 1px solid var(--border);
+        order: 2;
+      }
+      .sidebar.collapsed { height: 92px; }
+      .header-actions .hide-sm { display: none; }
+      .mobile-sheet-toggle {
+        display: flex;
+        justify-content: center;
+        padding: 5px 0 2px;
+        cursor: pointer;
+        background: var(--surface);
+      }
+      .sheet-handle {
+        width: 40px;
+        height: 4px;
+        border-radius: 99px;
+        background: var(--border);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="route-badge" id="routeBadge">11</div>
+        <div class="brand-text">
+          <div class="brand-title" id="routeTitle">Tokat Hat 11 · TOKİ Evleri</div>
+          <div class="brand-sub" id="routeSub">Kemer Köprü Son Durak ↔ TOKİ 3. Etap</div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button class="status-pill loading" id="statusPill" title="API durumu ve tanılama">
+          <span class="dot"></span>
+          <span id="statusText">BAĞLANIYOR...</span>
+        </button>
+
+        <button class="icon-btn" id="refreshBtn" title="Şimdi Yenile">
+          <span class="ring-wrap">
+            <svg class="ring-svg" viewBox="0 0 20 20">
+              <circle class="ring-bg" cx="10" cy="10" r="8"></circle>
+              <circle class="ring-fg" id="countdownRing" cx="10" cy="10" r="8" stroke-dasharray="50.26" stroke-dashoffset="0"></circle>
+            </svg>
+            <span id="countdownNum">10s</span>
+          </span>
+        </button>
+
+        <button class="icon-btn hide-sm" id="pauseBtn" title="Otomatik yenilemeyi duraklat">⏸</button>
+        <button class="icon-btn hide-sm" id="demoBtn" title="Test için demo otobüs simülasyonu">🚌 Demo</button>
+        <button class="icon-btn" id="themeBtn" title="Karanlık / Aydınlık mod">🌙</button>
+      </div>
+    </header>
+
+    <div class="main">
+      <aside class="sidebar" id="sidebar">
+        <div class="mobile-sheet-toggle" id="sheetToggle" title="Paneli büyüt/küçült">
+          <div class="sheet-handle"></div>
+        </div>
+
+        <div class="dir-bar">
+          <button class="dir-btn active" data-dir="both">Her İki Yön</button>
+          <button class="dir-btn" data-dir="0">Gidiş → TOKİ</button>
+          <button class="dir-btn" data-dir="1">Dönüş → Kemer</button>
+        </div>
+
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="buses">Canlı Araçlar</button>
+          <button class="tab-btn" data-tab="stops">Duraklar</button>
+          <button class="tab-btn" data-tab="api">Saatler & API</button>
+        </div>
+
+        <!-- TAB 1: BUSES -->
+        <div class="tab-panel active" id="panel-buses">
+          <div id="liveBanner"></div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-val" id="statBuses">0</div>
+              <div class="stat-lbl">Aktif Otobüs</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val" id="statStops">32</div>
+              <div class="stat-lbl">Durak Sayısı</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-val" id="statUpdated">--:--</div>
+              <div class="stat-lbl">Son Güncelleme</div>
+            </div>
+          </div>
+          <div id="busListContainer"></div>
+        </div>
+
+        <!-- TAB 2: STOPS -->
+        <div class="tab-panel" id="panel-stops">
+          <input type="text" class="search-input" id="stopSearch" placeholder="Durak ara (ör. Meydan, Hastane, TOKİ)..." />
+          <div id="stopListContainer"></div>
+        </div>
+
+        <!-- TAB 3: TIMETABLE & API -->
+        <div class="tab-panel" id="panel-api">
+          <div class="section-card">
+            <div class="section-title">
+              <span>🕒 Sefer Saatleri</span>
+              <span id="nextDepartureBadge" style="font-size:11px; color:var(--primary);"></span>
+            </div>
+            <div id="timetableContainer" style="font-size:12px; color:var(--muted);">
+              Canlı API bağlandığında hattın güncel hareket saatleri burada listelenir.
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-title">⚙️ Bağlantı & Proxy Ayarları</div>
+
+            <div class="form-group">
+              <label class="form-label" for="proxyMode">Bağlantı Yöntemi</label>
+              <select class="form-control" id="proxyMode">
+                <option value="netlify">Netlify Sunucu Proxy (/api) — Önerilen</option>
+                <option value="auto">Otomatik (Netlify → Direkt → Yedek Proxy)</option>
+                <option value="direct">Doğrudan Kentkart API</option>
+                <option value="allorigins">AllOrigins CORS Proxy</option>
+                <option value="corsproxy">CorsProxy.io</option>
+                <option value="codetabs">CodeTabs Proxy</option>
+                <option value="custom">Özel Proxy URL</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="customProxyWrap" style="display:none;">
+              <label class="form-label" for="customProxyInput">Özel Proxy Adresi (URL sonuna hedef eklenir)</label>
+              <input class="form-control" id="customProxyInput" placeholder="https://my-worker.workers.dev/?url=" />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="regionInput">Bölge Kodu (Tokat: 039)</label>
+                <input class="form-control" id="regionInput" value="039" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="routeInput">Hat Kodu</label>
+                <input class="form-control" id="routeInput" value="11" />
+              </div>
+            </div>
+
+            <div class="btn-row">
+              <button class="btn-primary" id="saveSettingsBtn">Kaydet ve Yenile</button>
+              <button class="btn-secondary" id="discoverCityBtn">Şehir Kodunu Doğrula</button>
+              <button class="btn-secondary" id="healthTestBtn">/api/health Test</button>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-title">
+              <span>🧪 Canlı Tanılama Günlüğü</span>
+              <button class="btn-secondary" id="copyLogBtn" style="padding:4px 8px; font-size:11px;">Kopyala</button>
+            </div>
+            <div class="log-box" id="diagLog">Başlatılıyor...</div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="map-wrap">
+        <div id="map"></div>
+        <div class="map-fabs">
+          <button class="fab" id="fitBtn" title="Güzergaha Odaklan">🗺️</button>
+          <button class="fab" id="locateBtn" title="Konumumu Göster">📍</button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    (() => {
+      // ============================================================
+      // 1. SABİTLER & ÇEVRİMDIŞI YEDEK GÜZERGAH (TOKAT HAT 11 - 32 DURAK)
+      // ============================================================
+      const KENTKART_BASE = 'https://service.kentkart.com';
+      const REFRESH_INTERVAL = 10; // saniye
+
+      const FALLBACK_STOPS_DIR0 = [
+        { id: 'fb-1',  name: 'KEMER KÖPRÜ SON DURAK',   lat: 40.3016, lng: 36.5441 },
+        { id: 'fb-2',  name: 'KEMER KÖPRÜ DURAĞI',      lat: 40.3031, lng: 36.5453 },
+        { id: 'fb-3',  name: 'FATİH CAMİ GİDİŞ',        lat: 40.3050, lng: 36.5469 },
+        { id: 'fb-4',  name: '7. NOTER GİDİŞ',          lat: 40.3069, lng: 36.5484 },
+        { id: 'fb-5',  name: 'TÖREOĞLU',                lat: 40.3087, lng: 36.5498 },
+        { id: 'fb-6',  name: 'ÇİÇEK PETROL',            lat: 40.3105, lng: 36.5512 },
+        { id: 'fb-7',  name: 'JANDARMA',                lat: 40.3122, lng: 36.5521 },
+        { id: 'fb-8',  name: 'ADLİYE - 4',              lat: 40.3137, lng: 36.5530 },
+        { id: 'fb-9',  name: 'RUH VE SİNİR HASTANESİ',  lat: 40.3150, lng: 36.5537 },
+        { id: 'fb-10', name: 'SSK DURAĞI',              lat: 40.3164, lng: 36.5542 },
+        { id: 'fb-11', name: 'BAKRAÇ GİDİŞ',            lat: 40.3177, lng: 36.5546 },
+        { id: 'fb-12', name: 'BEHZAT GİDİŞ',            lat: 40.3191, lng: 36.5548 },
+        { id: 'fb-13', name: 'MÜKAŞ',                   lat: 40.3210, lng: 36.5545 },
+        { id: 'fb-14', name: 'CUMHURİYET MEYDANI',      lat: 40.3235, lng: 36.5542 },
+        { id: 'fb-15', name: 'GOP LİSESİ',              lat: 40.3257, lng: 36.5553 },
+        { id: 'fb-16', name: 'NİKSAR YOLU SİVRİTEKKE',  lat: 40.3274, lng: 36.5572 },
+        { id: 'fb-17', name: 'SPOR MERKEZİ',            lat: 40.3289, lng: 36.5594 },
+        { id: 'fb-18', name: 'STADYUM DURAĞI',          lat: 40.3303, lng: 36.5618 },
+        { id: 'fb-19', name: 'TERMİNAL DURAĞI',         lat: 40.3321, lng: 36.5646 },
+        { id: 'fb-20', name: 'TOKAT DEVL. HAST. -2',    lat: 40.3340, lng: 36.5673 },
+        { id: 'fb-21', name: 'DOĞANCIBAĞLARI',          lat: 40.3360, lng: 36.5701 },
+        { id: 'fb-22', name: 'GALERİCİ SİTESİ 3',       lat: 40.3381, lng: 36.5734 },
+        { id: 'fb-23', name: 'POLİS KARAKOLU',          lat: 40.3401, lng: 36.5764 },
+        { id: 'fb-24', name: 'MELEK BAHÇESİ',           lat: 40.3422, lng: 36.5794 },
+        { id: 'fb-25', name: 'UZUNBURUN',               lat: 40.3446, lng: 36.5829 },
+        { id: 'fb-26', name: 'TOKİ KÖPRÜSÜ',            lat: 40.3471, lng: 36.5861 },
+        { id: 'fb-27', name: 'TOKİ 10',                 lat: 40.3490, lng: 36.5882 },
+        { id: 'fb-28', name: 'TOKİ 9',                  lat: 40.3507, lng: 36.5902 },
+        { id: 'fb-29', name: 'TOKİ 8',                  lat: 40.3523, lng: 36.5920 },
+        { id: 'fb-30', name: 'TOKİ 7',                  lat: 40.3539, lng: 36.5936 },
+        { id: 'fb-31', name: 'TOKİ 6',                  lat: 40.3554, lng: 36.5951 },
+        { id: 'fb-32', name: 'TOKİ 3. ETAP',            lat: 40.3572, lng: 36.5968 },
+      ];
+
+      // ============================================================
+      // 2. UYGULAMA DURUMU (STATE)
+      // ============================================================
+      const saved = (() => {
+        try { return JSON.parse(localStorage.getItem('tokat11_cfg') || '{}'); }
+        catch { return {}; }
+      })();
+
+      const state = {
+        proxyMode: saved.proxyMode || 'netlify',
+        customProxy: saved.customProxy || '',
+        region: saved.region || '039',
+        routeCode: saved.routeCode || '11',
+        dark: saved.dark === true,
+        viewDir: 'both', // '0' | '1' | 'both'
+        paused: false,
+        demoMode: false,
+        countdown: REFRESH_INTERVAL,
+        geometryLoaded: { 0: false, 1: false },
+        apiConnected: false,
+        lastError: null,
+        lastUpdated: null,
+        activeTransport: null,
+        dirs: {
+          0: { headSign: 'TOKİ 3. ETAP', points: [], stops: [], buses: [], times: [] },
+          1: { headSign: 'KEMER KÖPRÜ SON DURAK', points: [], stops: [], buses: [], times: [] },
+        },
+        demoBuses: [
+          { busId: 'demo-1', plate: '60 H 0114 (DEMO)', dir: 0, idx: 8, speed: 34 },
+          { busId: 'demo-2', plate: '60 H 0128 (DEMO)', dir: 1, idx: 18, speed: 29 },
+        ],
+        logs: [],
+      };
+
+      // ============================================================
+      // 3. DOM REFERANSLARI
+      // ============================================================
+      const el = {
+        routeBadge: document.getElementById('routeBadge'),
+        routeTitle: document.getElementById('routeTitle'),
+        routeSub: document.getElementById('routeSub'),
+        statusPill: document.getElementById('statusPill'),
+        statusText: document.getElementById('statusText'),
+        refreshBtn: document.getElementById('refreshBtn'),
+        countdownNum: document.getElementById('countdownNum'),
+        countdownRing: document.getElementById('countdownRing'),
+        pauseBtn: document.getElementById('pauseBtn'),
+        demoBtn: document.getElementById('demoBtn'),
+        themeBtn: document.getElementById('themeBtn'),
+        sidebar: document.getElementById('sidebar'),
+        sheetToggle: document.getElementById('sheetToggle'),
+        liveBanner: document.getElementById('liveBanner'),
+        statBuses: document.getElementById('statBuses'),
+        statStops: document.getElementById('statStops'),
+        statUpdated: document.getElementById('statUpdated'),
+        busListContainer: document.getElementById('busListContainer'),
+        stopSearch: document.getElementById('stopSearch'),
+        stopListContainer: document.getElementById('stopListContainer'),
+        timetableContainer: document.getElementById('timetableContainer'),
+        nextDepartureBadge: document.getElementById('nextDepartureBadge'),
+        proxyMode: document.getElementById('proxyMode'),
+        customProxyWrap: document.getElementById('customProxyWrap'),
+        customProxyInput: document.getElementById('customProxyInput'),
+        regionInput: document.getElementById('regionInput'),
+        routeInput: document.getElementById('routeInput'),
+        saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+        discoverCityBtn: document.getElementById('discoverCityBtn'),
+        healthTestBtn: document.getElementById('healthTestBtn'),
+        copyLogBtn: document.getElementById('copyLogBtn'),
+        diagLog: document.getElementById('diagLog'),
+        fitBtn: document.getElementById('fitBtn'),
+        locateBtn: document.getElementById('locateBtn'),
+      };
+
+      // ============================================================
+      // 4. LOGLAMA & YARDIMCI FONKSİYONLAR
+      // ============================================================
+      function addLog(msg, level = 'info') {
+        const t = new Date().toLocaleTimeString('tr-TR', { hour12: false });
+        state.logs.unshift({ t, msg, level });
+        if (state.logs.length > 60) state.logs.pop();
+        el.diagLog.innerHTML = state.logs
+          .map(l => `<div class="log-${l.level}">[${l.t}] ${escapeHtml(l.msg)}</div>`)
+          .join('');
+      }
+
+      function escapeHtml(str) {
+        return String(str ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function saveConfig() {
+        try {
+          localStorage.setItem('tokat11_cfg', JSON.stringify({
+            proxyMode: state.proxyMode,
+            customProxy: state.customProxy,
+            region: state.region,
+            routeCode: state.routeCode,
+            dark: state.dark,
+          }));
+        } catch {}
+      }
+
+      function haversineMeters(lat1, lng1, lat2, lng2) {
+        const R = 6371000;
+        const toRad = d => d * Math.PI / 180;
+        const dLat = toRad(lat2 - lat1);
+        const dLng = toRad(lng2 - lng1);
+        const a = Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+        return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+
+      function parseCoordPair(obj) {
+        if (!obj || typeof obj !== 'object') return null;
+        const rawLat = obj.lat ?? obj.latitude ?? obj.y ?? obj.Lat;
+        const rawLng = obj.lng ?? obj.lon ?? obj.longitude ?? obj.x ?? obj.Lng;
+        const lat = parseFloat(rawLat);
+        const lng = parseFloat(rawLng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        if (lat >= 35 && lat <= 43 && lng >= 25 && lng <= 46) return { lat, lng };
+        // Bazı uç noktalarda x=lat, y=lng ters olabilir
+        if (lng >= 35 && lng <= 43 && lat >= 25 && lat <= 46) return { lat: lng, lng: lat };
+        return null;
+      }
+
+      // ============================================================
+      // 5. HARİTA KURULUMU (LEAFLET)
+      // ============================================================
+      const map = L.map('map', { zoomControl: true }).setView([40.326, 36.565], 13);
+
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(map);
+
+      function applyTheme() {
+        document.body.classList.toggle('dark', state.dark);
+        el.themeBtn.textContent = state.dark ? '☀️' : '🌙';
+      }
+      applyTheme();
+
+      const layers = {
+        route0: L.layerGroup().addTo(map),
+        route1: L.layerGroup().addTo(map),
+        stops0: L.layerGroup().addTo(map),
+        stops1: L.layerGroup().addTo(map),
+        buses: L.layerGroup().addTo(map),
+        user: L.layerGroup().addTo(map),
+      };
+
+      const busMarkers = new Map(); // busKey -> { marker, lat, lng }
+
+      // ============================================================
+      // 6. KENTKART API İSTEMCİSİ (NETLIFY PROXY ÖNCELİKLİ)
+      // ============================================================
+      function buildTransportQueue() {
+        const isLocalFile = window.location.protocol === 'file:';
+        const transports = {
+          netlify: {
+            name: 'Netlify Proxy (/api)',
+            buildUrl: (path) => `/api/${path.replace(/^\/+/, '')}`,
+            unwrap: (data) => data,
+          },
+          direct: {
+            name: 'Direkt Kentkart',
+            buildUrl: (path) => `${KENTKART_BASE}/${path.replace(/^\/+/, '')}`,
+            unwrap: (data) => data,
+          },
+          allorigins: {
+            name: 'AllOrigins Proxy',
+            buildUrl: (path) => `https://api.allorigins.win/raw?url=${encodeURIComponent(KENTKART_BASE + '/' + path.replace(/^\/+/, ''))}`,
+            unwrap: (data) => data,
+          },
+          corsproxy: {
+            name: 'CorsProxy.io',
+            buildUrl: (path) => `https://corsproxy.io/?url=${encodeURIComponent(KENTKART_BASE + '/' + path.replace(/^\/+/, ''))}`,
+            unwrap: (data) => data,
+          },
+          codetabs: {
+            name: 'CodeTabs Proxy',
+            buildUrl: (path) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(KENTKART_BASE + '/' + path.replace(/^\/+/, ''))}`,
+            unwrap: (data) => data,
+          },
+          custom: {
+            name: 'Özel Proxy',
+            buildUrl: (path) => {
+              const base = (state.customProxy || '').trim();
+              const full = `${KENTKART_BASE}/${path.replace(/^\/+/, '')}`;
+              if (!base) return full;
+              return base.includes('?url=') || base.includes('?quest=')
+                ? `${base}${encodeURIComponent(full)}`
+                : `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+            },
+            unwrap: (data) => data,
+          },
+        };
+
+        if (state.proxyMode === 'netlify') {
+          return isLocalFile
+            ? [transports.direct, transports.allorigins, transports.corsproxy]
+            : [transports.netlify];
+        }
+        if (state.proxyMode === 'auto') {
+          return isLocalFile
+            ? [transports.direct, transports.allorigins, transports.corsproxy, transports.codetabs]
+            : [transports.netlify, transports.direct, transports.allorigins, transports.corsproxy, transports.codetabs];
+        }
+        return [transports[state.proxyMode] || transports.netlify];
+      }
+
+      async function fetchKentkart(apiPath) {
+        const queue = buildTransportQueue();
+        let lastErr = null;
+
+        for (const tr of queue) {
+          const url = tr.buildUrl(apiPath);
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 11000);
+
+          try {
+            const resp = await fetch(url, { method: 'GET', signal: controller.signal });
+            clearTimeout(timer);
+
+            const text = await resp.text();
+            if (!resp.ok) {
+              throw new Error(`HTTP ${resp.status} (${text.slice(0, 80)})`);
+            }
+
+            let parsed;
+            try {
+              parsed = JSON.parse(text);
+            } catch {
+              throw new Error(`JSON dışı yanıt (${text.slice(0, 60)})`);
+            }
+
+            const data = tr.unwrap(parsed);
+            state.activeTransport = tr.name;
+            addLog(`OK [${tr.name}] → ${apiPath.split('?')[0]}`, 'ok');
+            return data;
+          } catch (err) {
+            clearTimeout(timer);
+            const reason = err.name === 'AbortError' ? 'Zaman aşımı (11sn)' : (err.message || String(err));
+            lastErr = `[${tr.name}] ${reason}`;
+            addLog(`HATA ${lastErr}`, 'err');
+          }
+        }
+        throw new Error(lastErr || 'Tüm bağlantı yöntemleri başarısız oldu.');
+      }
+
+      // ============================================================
+      // 7. VERİ AYRIŞTIRICI (PATHINFO)
+      // ============================================================
+      function parsePathInfoResponse(data, dir) {
+        if (!data || typeof data !== 'object') return null;
+
+        // Kentkart yanıtı genellikle { result: {...}, pathList: [ {...} ] } şeklindedir
+        const pathList = Array.isArray(data.pathList) ? data.pathList : (Array.isArray(data.data?.pathList) ? data.data.pathList : []);
+        const pathObj = pathList[0] || data;
+
+        const points = [];
+        const rawPoints = pathObj.pointList || data.pointList || [];
+        if (Array.isArray(rawPoints)) {
+          for (const p of rawPoints) {
+            const c = parseCoordPair(p);
+            if (c) points.push([c.lat, c.lng]);
+          }
+        }
+
+        const stops = [];
+        const rawStops = pathObj.busStopList || data.busStopList || [];
+        if (Array.isArray(rawStops)) {
+          for (let i = 0; i < rawStops.length; i++) {
+            const s = rawStops[i];
+            const c = parseCoordPair(s);
+            if (!c) continue;
+            stops.push({
+              id: String(s.stopId ?? s.busStopId ?? s.id ?? `s-${dir}-${i}`),
+              seq: Number(s.seq ?? s.order ?? (i + 1)),
+              name: String(s.stopName ?? s.name ?? `Durak ${i + 1}`).trim(),
+              lat: c.lat,
+              lng: c.lng,
+            });
+          }
+        }
+
+        const buses = [];
+        const rawBuses = pathObj.busList || data.busList || [];
+        if (Array.isArray(rawBuses)) {
+          for (let i = 0; i < rawBuses.length; i++) {
+            const b = rawBuses[i];
+            const c = parseCoordPair(b);
+            if (!c) continue;
+            buses.push({
+              busId: String(b.busId ?? b.id ?? b.plateNumber ?? `bus-${dir}-${i}`),
+              plate: String(b.plateNumber ?? b.plate ?? b.busId ?? `Araç #${i + 1}`).trim(),
+              lat: c.lat,
+              lng: c.lng,
+              speed: b.speed !== undefined && b.speed !== null ? Math.round(Number(b.speed)) : null,
+              bearing: Number(b.bearing ?? b.angle ?? b.heading ?? 0),
+              stopId: b.stopId ? String(b.stopId) : null,
+              ac: Boolean(b.ac),
+              disabled: Boolean(b.disabled || b.accessible),
+              bike: Boolean(b.bike),
+              dir,
+            });
+          }
+        }
+
+        const times = [];
+        const rawSchedules = pathObj.scheduleList || data.scheduleList || [];
+        const rawTimetables = pathObj.timeTableList || data.timeTableList || [];
+        const extractTimes = (arr) => {
+          if (!Array.isArray(arr)) return;
+          for (const item of arr) {
+            if (typeof item === 'string' && /^\d{1,2}:\d{2}/.test(item)) {
+              times.push(item.slice(0, 5));
+            } else if (item && typeof item === 'object') {
+              const t = item.departureTime || item.startTime || item.time;
+              if (typeof t === 'string' && /^\d{1,2}:\d{2}/.test(t)) times.push(t.slice(0, 5));
+              if (Array.isArray(item.timeList)) extractTimes(item.timeList);
+              if (Array.isArray(item.tripList)) extractTimes(item.tripList);
+            }
+          }
+        };
+        extractTimes(rawTimetables);
+        if (times.length === 0) extractTimes(rawSchedules);
+
+        const uniqueTimes = [...new Set(times)].sort();
+
+        return {
+          headSign: pathObj.headSign || pathObj.name || (dir === 0 ? 'TOKİ 3. ETAP' : 'KEMER KÖPRÜ SON DURAK'),
+          points,
+          stops,
+          buses,
+          times: uniqueTimes,
+        };
+      }
+
+      // ============================================================
+      // 8. GÜZERGAH, DURAK VE OTOBÜS ÇİZİMİ
+      // ============================================================
+      function loadFallbackData() {
+        state.dirs[0].stops = FALLBACK_STOPS_DIR0.map((s, i) => ({ ...s, seq: i + 1 }));
+        state.dirs[0].points = FALLBACK_STOPS_DIR0.map(s => [s.lat, s.lng]);
+        state.dirs[0].headSign = 'TOKİ 3. ETAP';
+
+        const rev = [...FALLBACK_STOPS_DIR0].reverse();
+        state.dirs[1].stops = rev.map((s, i) => ({ ...s, id: `fb-r-${i + 1}`, seq: i + 1 }));
+        state.dirs[1].points = rev.map(s => [s.lat, s.lng]);
+        state.dirs[1].headSign = 'KEMER KÖPRÜ SON DURAK';
+      }
+
+      function renderRoutesAndStops() {
+        layers.route0.clearLayers();
+        layers.route1.clearLayers();
+        layers.stops0.clearLayers();
+        layers.stops1.clearLayers();
+
+        const show0 = state.viewDir === 'both' || state.viewDir === '0';
+        const show1 = state.viewDir === 'both' || state.viewDir === '1';
+
+        if (show0 && state.dirs[0].points.length > 1) {
+          L.polyline(state.dirs[0].points, {
+            color: '#0d9488',
+            weight: 5,
+            opacity: 0.85,
+          }).addTo(layers.route0);
+        }
+
+        if (show1 && state.dirs[1].points.length > 1) {
+          L.polyline(state.dirs[1].points, {
+            color: '#ea580c',
+            weight: 4,
+            opacity: 0.78,
+            dashArray: state.viewDir === 'both' ? '8, 7' : null,
+          }).addTo(layers.route1);
+        }
+
+        const drawStops = (dir, layer, color) => {
+          const stops = state.dirs[dir].stops;
+          stops.forEach((s, idx) => {
+            const isEnd = idx === 0 || idx === stops.length - 1;
+            const marker = L.circleMarker([s.lat, s.lng], {
+              radius: isEnd ? 7 : 5,
+              color: '#ffffff',
+              weight: 2,
+              fillColor: color,
+              fillOpacity: 1,
+            });
+            marker.bindPopup(() => buildStopPopup(s, dir));
+            marker.addTo(layer);
+          });
+        };
+
+        if (show0) drawStops(0, layers.stops0, '#0d9488');
+        if (show1) drawStops(1, layers.stops1, '#ea580c');
+
+        const stopCount = state.viewDir === '1'
+          ? state.dirs[1].stops.length
+          : state.dirs[0].stops.length;
+        el.statStops.textContent = stopCount || 32;
+        renderStopList();
+      }
+
+      function buildStopPopup(stop, dir) {
+        const buses = getVisibleBuses().filter(b => b.dir === dir);
+        let nearestText = 'Yaklaşan aktif araç görünmüyor.';
+        if (buses.length > 0) {
+          let best = null;
+          for (const b of buses) {
+            const d = haversineMeters(stop.lat, stop.lng, b.lat, b.lng);
+            if (!best || d < best.d) best = { b, d };
+          }
+          if (best) {
+            const km = (best.d / 1000).toFixed(2);
+            const mins = Math.max(1, Math.round(best.d / 420)); // ~25 km/s şehir içi ortalama
+            nearestText = `🚌 En yakın araç: <b>${escapeHtml(best.b.plate)}</b> (~${km} km · ~${mins} dk)`;
+          }
+        }
+        return `
+          <div style="font-family:Inter,sans-serif; min-width:190px;">
+            <div style="font-weight:800; font-size:13px; margin-bottom:3px;">${stop.seq}. ${escapeHtml(stop.name)}</div>
+            <div style="font-size:11px; color:#64748b; margin-bottom:6px;">
+              ${dir === 0 ? 'Gidiş → TOKİ' : 'Dönüş → Kemer Köprü'} · Durak ID: ${escapeHtml(stop.id)}
+            </div>
+            <div style="font-size:12px;">${nearestText}</div>
+          </div>
+        `;
+      }
+
+      function getVisibleBuses() {
+        if (state.demoMode) {
+          return state.demoBuses
+            .filter(db => state.viewDir === 'both' || String(db.dir) === state.viewDir)
+            .map(db => {
+              const pts = state.dirs[db.dir].stops;
+              const st = pts[db.idx % pts.length] || FALLBACK_STOPS_DIR0[0];
+              return {
+                busId: db.busId,
+                plate: db.plate,
+                lat: st.lat,
+                lng: st.lng,
+                speed: db.speed,
+                dir: db.dir,
+                ac: true,
+                disabled: true,
+              };
+            });
+        }
+
+        const out = [];
+        if (state.viewDir === 'both' || state.viewDir === '0') out.push(...state.dirs[0].buses);
+        if (state.viewDir === 'both' || state.viewDir === '1') out.push(...state.dirs[1].buses);
+        return out;
+      }
+
+      function findNearestStop(bus) {
+        const stops = state.dirs[bus.dir]?.stops || [];
+        if (!stops.length) return null;
+        let best = null;
+        for (const s of stops) {
+          const d = haversineMeters(bus.lat, bus.lng, s.lat, s.lng);
+          if (!best || d < best.d) best = { stop: s, d };
+        }
+        return best;
+      }
+
+      function animateMarker(marker, fromLatLng, toLatLng, duration = 900) {
+        const start = performance.now();
+        function step(now) {
+          const t = Math.min(1, (now - start) / duration);
+          const ease = 1 - Math.pow(1 - t, 3);
+          const lat = fromLatLng.lat + (toLatLng[0] - fromLatLng.lat) * ease;
+          const lng = fromLatLng.lng + (toLatLng[1] - fromLatLng.lng) * ease;
+          marker.setLatLng([lat, lng]);
+          if (t < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+
+      function renderBuses() {
+        const buses = getVisibleBuses();
+        const activeKeys = new Set();
+
+        for (const bus of buses) {
+          const key = `${bus.dir}-${bus.busId}`;
+          activeKeys.add(key);
+
+          const icon = L.divIcon({
+            className: '',
+            iconSize: [70, 52],
+            iconAnchor: [35, 19],
+            html: `
+              <div class="bus-marker-wrap">
+                <div class="bus-dot-ring d${bus.dir}">🚌</div>
+                <div class="bus-plate-pill">${escapeHtml(bus.plate)}</div>
+              </div>
+            `,
+          });
+
+          const near = findNearestStop(bus);
+          const popupHtml = `
+            <div style="font-family:Inter,sans-serif; min-width:190px;">
+              <div style="font-weight:800; font-size:14px;">🚌 ${escapeHtml(bus.plate)}</div>
+              <div style="font-size:11.5px; color:#64748b; margin:3px 0 6px;">
+                ${bus.dir === 0 ? 'Gidiş → TOKİ 3. Etap' : 'Dönüş → Kemer Köprü'}
+              </div>
+              <div style="font-size:12px; line-height:1.5;">
+                ${bus.speed !== null ? `Hız: <b>${bus.speed} km/s</b><br>` : ''}
+                ${near ? `Yakın Durak: <b>${escapeHtml(near.stop.name)}</b> (${Math.round(near.d)} m)<br>` : ''}
+                ${bus.disabled ? '♿ Engelsiz ' : ''}${bus.ac ? '❄️ Klimalı' : ''}
+              </div>
+            </div>
+          `;
+
+          if (busMarkers.has(key)) {
+            const entry = busMarkers.get(key);
+            entry.marker.setIcon(icon);
+            entry.marker.setPopupContent(popupHtml);
+            animateMarker(entry.marker, entry.marker.getLatLng(), [bus.lat, bus.lng]);
+          } else {
+            const marker = L.marker([bus.lat, bus.lng], { icon, zIndexOffset: 500 })
+              .bindPopup(popupHtml)
+              .addTo(layers.buses);
+            busMarkers.set(key, { marker });
+          }
+        }
+
+        // Artık aktif olmayan araç işaretçilerini temizle
+        for (const [key, entry] of busMarkers.entries()) {
+          if (!activeKeys.has(key)) {
+            layers.buses.removeLayer(entry.marker);
+            busMarkers.delete(key);
+          }
+        }
+
+        el.statBuses.textContent = buses.length;
+        renderBusCards(buses);
+      }
+
+      function renderBusCards(buses) {
+        if (buses.length === 0) {
+          if (state.apiConnected) {
+            el.busListContainer.innerHTML = `
+              <div class="empty-state">
+                <strong>Şu an aktif seferde araç görünmüyor</strong>
+                Kentkart canlı API bağlantısı sağlıklı (${escapeHtml(state.activeTransport || 'Canlı')}), ancak Hat ${escapeHtml(state.routeCode)} üzerinde şu an sinyal veren araç yok (sefer aralığı veya gece saatleri olabilir).
+              </div>`;
+          } else {
+            el.busListContainer.innerHTML = `
+              <div class="empty-state">
+                <strong>Canlı araç verisi alınamadı</strong>
+                Haritada çevrimdışı 32 duraklı yedek güzergah gösteriliyor. Netlify'a deploy ettikten sonra <b>/api</b> proxy otomatik devreye girer.
+              </div>`;
+          }
+          return;
+        }
+
+        el.busListContainer.innerHTML = buses.map(b => {
+          const near = findNearestStop(b);
+          return `
+            <div class="bus-card" data-lat="${b.lat}" data-lng="${b.lng}" data-key="${b.dir}-${escapeHtml(b.busId)}">
+              <div class="bus-card-top">
+                <span class="plate-tag">🚌 ${escapeHtml(b.plate)}</span>
+                <span class="dir-tag d${b.dir}">${b.dir === 0 ? 'Gidiş → TOKİ' : 'Dönüş → Kemer'}</span>
+              </div>
+              <div class="bus-meta">
+                ${near ? `<span>📍 ${escapeHtml(near.stop.name)} (${Math.round(near.d)} m)</span>` : ''}
+                ${b.speed !== null ? `<span>⚡ ${b.speed} km/s</span>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        el.busListContainer.querySelectorAll('.bus-card').forEach(card => {
+          card.addEventListener('click', () => {
+            const lat = parseFloat(card.dataset.lat);
+            const lng = parseFloat(card.dataset.lng);
+            const key = card.dataset.key;
+            map.flyTo([lat, lng], 16, { duration: 0.7 });
+            const entry = busMarkers.get(key);
+            if (entry) entry.marker.openPopup();
+          });
+        });
+      }
+
+      function renderStopList() {
+        const q = (el.stopSearch.value || '').trim().toLocaleLowerCase('tr-TR');
+        const dir = state.viewDir === '1' ? 1 : 0;
+        const stops = state.dirs[dir].stops || [];
+        const buses = getVisibleBuses().filter(b => b.dir === dir);
+
+        const filtered = stops.filter(s => !q || s.name.toLocaleLowerCase('tr-TR').includes(q));
+        if (!filtered.length) {
+          el.stopListContainer.innerHTML = `<div class="empty-state">Aramanızla eşleşen durak bulunamadı.</div>`;
+          return;
+        }
+
+        el.stopListContainer.innerHTML = filtered.map(s => {
+          let busNearby = false;
+          for (const b of buses) {
+            if (haversineMeters(s.lat, s.lng, b.lat, b.lng) < 280) { busNearby = true; break; }
+          }
+          return `
+            <div class="stop-item d${dir}" data-lat="${s.lat}" data-lng="${s.lng}">
+              <div class="stop-num">${s.seq}</div>
+              <div class="stop-info">
+                <div class="stop-name">${escapeHtml(s.name)}</div>
+                <div class="stop-sub">${dir === 0 ? 'Gidiş → TOKİ' : 'Dönüş → Kemer Köprü'}</div>
+              </div>
+              ${busNearby ? '<span class="stop-bus-chip">🚌 Yakında</span>' : ''}
+            </div>
+          `;
+        }).join('');
+
+        el.stopListContainer.querySelectorAll('.stop-item').forEach(item => {
+          item.addEventListener('click', () => {
+            map.flyTo([parseFloat(item.dataset.lat), parseFloat(item.dataset.lng)], 16, { duration: 0.6 });
+          });
+        });
+      }
+
+      function renderTimetable() {
+        const dir = state.viewDir === '1' ? 1 : 0;
+        const times = state.dirs[dir].times || [];
+        if (!times.length) {
+          el.nextDepartureBadge.textContent = '';
+          el.timetableContainer.innerHTML = 'API bu yön için hareket saati listesi döndürmedi veya henüz bağlanılmadı.';
+          return;
+        }
+
+        const now = new Date();
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        let nextFound = null;
+
+        const html = times.map(t => {
+          const [hh, mm] = t.split(':').map(Number);
+          const mins = hh * 60 + mm;
+          let cls = '';
+          if (mins < nowMin) cls = 'past';
+          else if (nextFound === null) {
+            nextFound = { t, diff: mins - nowMin };
+            cls = 'next';
+          }
+          return `<span class="time-chip ${cls}">${escapeHtml(t)}</span>`;
+        }).join('');
+
+        el.nextDepartureBadge.textContent = nextFound
+          ? `Sonraki: ${nextFound.t} (${nextFound.diff} dk)`
+          : 'Bugünün son seferi geçti';
+
+        el.timetableContainer.innerHTML = `<div class="times-grid">${html}</div>`;
+      }
+
+      function updateStatusUI() {
+        const buses = getVisibleBuses();
+        if (state.demoMode) {
+          el.statusPill.className = 'status-pill info';
+          el.statusText.textContent = `DEMO · ${buses.length} OTOBÜS`;
+          el.liveBanner.innerHTML = `
+            <div class="alert-banner info">
+              <strong>Demo Simülasyon Modu Aktif</strong> — Gösterilen araçlar test amaçlı hareket etmektedir. Gerçek veriye dönmek için üst çubuktan <b>Demo</b> butonunu kapatın.
+            </div>`;
+          return;
+        }
+
+        if (state.apiConnected) {
+          if (buses.length > 0) {
+            el.statusPill.className = 'status-pill ok';
+            el.statusText.textContent = `CANLI · ${buses.length} OTOBÜS`;
+          } else {
+            el.statusPill.className = 'status-pill info';
+            el.statusText.textContent = 'CANLI · AKTİF ARAÇ YOK';
+          }
+          el.liveBanner.innerHTML = '';
+        } else {
+          el.statusPill.className = 'status-pill err';
+          el.statusText.textContent = 'ÇEVRİMDIŞI YEDEK';
+          const localHint = window.location.protocol === 'file:'
+            ? 'Dosyayı bilgisayarınızda doğrudan açtığınız için Netlify <code>/api</code> proxy çalışmıyor. GitHub → Netlify üzerinden yayınladığınızda canlı veri otomatik akacaktır.'
+            : 'Kentkart API bağlantısı kurulamadı. "Saatler & API" sekmesinden bağlantı yöntemini veya tanılama günlüğünü kontrol edebilirsiniz.';
+          el.liveBanner.innerHTML = `
+            <div class="alert-banner err">
+              ${localHint}<br>
+              <button type="button" id="openApiTabBtn"><span>Saatler & API Ayarlarını Aç</span></button>
+            </div>`;
+          const btn = document.getElementById('openApiTabBtn');
+          if (btn) btn.addEventListener('click', () => switchTab('api'));
+        }
+      }
+
+      function fitToRoute() {
+        const pts = [];
+        if (state.viewDir === 'both' || state.viewDir === '0') pts.push(...state.dirs[0].points);
+        if (state.viewDir === 'both' || state.viewDir === '1') pts.push(...state.dirs[1].points);
+        if (pts.length > 1) {
+          map.fitBounds(L.latLngBounds(pts), { padding: [36, 36] });
+        }
+      }
+
+      // ============================================================
+      // 9. CANLI VERİ ÇEKME DÖNGÜSÜ
+      // ============================================================
+      async function pollLiveData(forceFull = false) {
+        if (state.demoMode) {
+          state.demoBuses.forEach(db => {
+            const len = state.dirs[db.dir].stops.length || 32;
+            db.idx = (db.idx + 1) % len;
+          });
+          renderBuses();
+          updateStatusUI();
+          return;
+        }
+
+        const dirsToFetch = [0, 1];
+        let anySuccess = false;
+        let geometryChanged = false;
+
+        for (const dir of dirsToFetch) {
+          const needFull = forceFull || !state.geometryLoaded[dir];
+          const resultType = needFull ? '111111' : '010000';
+          const path = `rl1/web/pathInfo?region=${encodeURIComponent(state.region)}&lang=tr&direction=${dir}&displayRouteCode=${encodeURIComponent(state.routeCode)}&resultType=${resultType}`;
+
+          try {
+            const data = await fetchKentkart(path);
+            const parsed = parsePathInfoResponse(data, dir);
+            if (parsed) {
+              anySuccess = true;
+              state.dirs[dir].buses = parsed.buses;
+              if (needFull) {
+                if (parsed.points.length > 1) {
+                  state.dirs[dir].points = parsed.points;
+                  geometryChanged = true;
+                }
+                if (parsed.stops.length > 0) {
+                  state.dirs[dir].stops = parsed.stops;
+                  geometryChanged = true;
+                }
+                if (parsed.times.length > 0) state.dirs[dir].times = parsed.times;
+                if (parsed.headSign) state.dirs[dir].headSign = parsed.headSign;
+                state.geometryLoaded[dir] = parsed.points.length > 1 || parsed.stops.length > 0;
+              }
+            }
+          } catch (err) {
+            state.lastError = err.message;
+          }
+        }
+
+        state.apiConnected = anySuccess;
+        state.lastUpdated = new Date();
+        el.statUpdated.textContent = state.lastUpdated.toLocaleTimeString('tr-TR', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        });
+
+        el.routeBadge.textContent = state.routeCode;
+        el.routeTitle.textContent = `Tokat Hat ${state.routeCode} · TOKİ Evleri`;
+        el.routeSub.textContent = `${state.dirs[1].headSign} ↔ ${state.dirs[0].headSign}`;
+
+        if (geometryChanged) {
+          renderRoutesAndStops();
+          fitToRoute();
+        } else {
+          renderStopList();
+        }
+
+        renderTimetable();
+        renderBuses();
+        updateStatusUI();
+      }
+
+      async function discoverTokatRegion() {
+        addLog('Kentkart şehir listesi sorgulanıyor...', 'info');
+        for (const ep of ['rl1/api/v2.0/city', 'rl1/web/city']) {
+          try {
+            const data = await fetchKentkart(ep);
+            const list = data.city || data.cityList || data.result || (Array.isArray(data) ? data : []);
+            if (Array.isArray(list)) {
+              const tokat = list.find(c =>
+                JSON.stringify(c).toLocaleLowerCase('tr-TR').includes('tokat')
+              );
+              if (tokat) {
+                const code = String(tokat.region || tokat.regionCode || tokat.id || '039');
+                state.region = code;
+                el.regionInput.value = code;
+                saveConfig();
+                addLog(`Tokat bulundu! Bölge kodu: ${code}`, 'ok');
+                state.geometryLoaded = { 0: false, 1: false };
+                await pollLiveData(true);
+                return;
+              }
+            }
+          } catch {}
+        }
+        addLog('Şehir keşfi tamamlanamadı; Tokat için varsayılan 039 kodu korunuyor.', 'err');
+      }
+
+      async function testNetlifyHealth() {
+        addLog('/api/health kontrol ediliyor...', 'info');
+        try {
+          const r = await fetch('/api/health');
+          const txt = await r.text();
+          if (r.ok) addLog(`/api/health BAŞARILI: ${txt}`, 'ok');
+          else addLog(`/api/health HTTP ${r.status}: ${txt.slice(0, 100)}`, 'err');
+        } catch (err) {
+          addLog(`/api/health erişilemedi: ${err.message}`, 'err');
+        }
+      }
+
+      // ============================================================
+      // 10. ARAYÜZ ETKİLEŞİMLERİ & ZAMANLAYICI
+      // ============================================================
+      function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tabName));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tabName}`));
+      }
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+      });
+
+      document.querySelectorAll('.dir-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.viewDir = btn.dataset.dir;
+          document.querySelectorAll('.dir-btn').forEach(b => b.classList.toggle('active', b === btn));
+          renderRoutesAndStops();
+          renderTimetable();
+          renderBuses();
+          fitToRoute();
+        });
+      });
+
+      el.statusPill.addEventListener('click', () => switchTab('api'));
+      el.stopSearch.addEventListener('input', renderStopList);
+
+      el.proxyMode.value = state.proxyMode;
+      el.customProxyInput.value = state.customProxy;
+      el.regionInput.value = state.region;
+      el.routeInput.value = state.routeCode;
+      el.customProxyWrap.style.display = state.proxyMode === 'custom' ? 'block' : 'none';
+
+      el.proxyMode.addEventListener('change', () => {
+        el.customProxyWrap.style.display = el.proxyMode.value === 'custom' ? 'block' : 'none';
+      });
+
+      el.saveSettingsBtn.addEventListener('click', () => {
+        state.proxyMode = el.proxyMode.value;
+        state.customProxy = el.customProxyInput.value.trim();
+        state.region = el.regionInput.value.trim() || '039';
+        state.routeCode = el.routeInput.value.trim() || '11';
+        state.geometryLoaded = { 0: false, 1: false };
+        saveConfig();
+        addLog(`Ayarlar kaydedildi (Mod: ${state.proxyMode}, Bölge: ${state.region}, Hat: ${state.routeCode})`, 'info');
+        state.countdown = REFRESH_INTERVAL;
+        pollLiveData(true);
+      });
+
+      el.discoverCityBtn.addEventListener('click', discoverTokatRegion);
+      el.healthTestBtn.addEventListener('click', testNetlifyHealth);
+
+      el.copyLogBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(el.diagLog.innerText);
+          el.copyLogBtn.textContent = 'Kopyalandı ✓';
+          setTimeout(() => (el.copyLogBtn.textContent = 'Kopyala'), 1500);
+        } catch {}
+      });
+
+      el.refreshBtn.addEventListener('click', () => {
+        state.countdown = REFRESH_INTERVAL;
+        pollLiveData(false);
+      });
+
+      el.pauseBtn.addEventListener('click', () => {
+        state.paused = !state.paused;
+        el.pauseBtn.textContent = state.paused ? '▶' : '⏸';
+        el.pauseBtn.classList.toggle('active', state.paused);
+      });
+
+      el.demoBtn.addEventListener('click', () => {
+        state.demoMode = !state.demoMode;
+        el.demoBtn.classList.toggle('active', state.demoMode);
+        renderBuses();
+        updateStatusUI();
+      });
+
+      el.themeBtn.addEventListener('click', () => {
+        state.dark = !state.dark;
+        saveConfig();
+        applyTheme();
+      });
+
+      el.fitBtn.addEventListener('click', fitToRoute);
+
+      el.locateBtn.addEventListener('click', () => {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(pos => {
+          const { latitude, longitude } = pos.coords;
+          layers.user.clearLayers();
+          L.circleMarker([latitude, longitude], {
+            radius: 8,
+            color: '#fff',
+            weight: 3,
+            fillColor: '#2563eb',
+            fillOpacity: 1,
+          }).bindPopup('Konumunuz').addTo(layers.user);
+          map.flyTo([latitude, longitude], 15, { duration: 0.7 });
+        });
+      });
+
+      el.sheetToggle.addEventListener('click', () => {
+        el.sidebar.classList.toggle('collapsed');
+        setTimeout(() => map.invalidateSize(), 220);
+      });
+
+      // 1 saniyelik geri sayım döngüsü
+      const CIRCUMFERENCE = 50.26;
+      setInterval(() => {
+        if (state.paused) return;
+        state.countdown -= 1;
+        if (state.countdown <= 0) {
+          state.countdown = REFRESH_INTERVAL;
+          pollLiveData(false);
+        }
+        el.countdownNum.textContent = `${state.countdown}s`;
+        const progress = (REFRESH_INTERVAL - state.countdown) / REFRESH_INTERVAL;
+        el.countdownRing.setAttribute('stroke-dashoffset', (progress * CIRCUMFERENCE).toFixed(2));
+      }, 1000);
+
+      // ============================================================
+      // 11. BAŞLATMA
+      // ============================================================
+      loadFallbackData();
+      renderRoutesAndStops();
+      fitToRoute();
+      addLog(`Uygulama başlatıldı (Bölge: ${state.region}, Hat: ${state.routeCode}, Mod: ${state.proxyMode})`, 'info');
+      pollLiveData(true);
+    })();
+  </script>
+</body>
+</html>
